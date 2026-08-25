@@ -751,9 +751,9 @@
   }
 
   function renderPdfPage(pageNum) {
-    if (!state.pdfDoc) return;
+    if (!state.pdfDoc) return Promise.resolve();
 
-    state.pdfDoc.getPage(pageNum).then(page => {
+    return state.pdfDoc.getPage(pageNum).then(page => {
       state.pdfPageObj = page;
 
       const MAX_CANVAS_DIM = 16384;
@@ -796,9 +796,8 @@
         canvasContext: ctx,
         viewport: renderViewport
       });
-      state.renderTask.promise.then(() => {
+      return state.renderTask.promise.then(() => {
         state.renderTask = null;
-        console.log(`PDF rendered: scale=${cssScale.toFixed(2)}, canvas=${canvas.width}x${canvas.height}, css=${state.canvasWidth}x${state.canvasHeight}`);
         fitToViewport();
         renderNodes();
         updateStats();

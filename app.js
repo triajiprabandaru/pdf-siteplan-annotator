@@ -195,15 +195,15 @@
     drawerDragHandle: document.getElementById('drawer-drag-handle'),
     drawerNodeCodeBadge: document.getElementById('drawer-node-code-badge'),
 
-    // Cloud Siteplans Modal
+    // Cloud Siteplans Modal & Home Library
     cloudSiteplansModal: document.getElementById('cloud-siteplans-modal'),
     cloudSiteplansList: document.getElementById('cloud-siteplans-list'),
     btnCloudSyncCurrent: document.getElementById('btn-cloud-sync-current'),
     cloudModalCloseBtn: document.getElementById('cloud-modal-close-btn'),
-    cloudModalBtnClose: document.getElementById('cloud-modal-btn-close')
+    cloudModalBtnClose: document.getElementById('cloud-modal-btn-close'),
+    homeCloudSiteplans: document.getElementById('home-cloud-siteplans')
   };
 
-  // --- INITIALIZATION ---
   // --- INITIALIZATION ---
   function init() {
     setupEventListeners();
@@ -213,7 +213,8 @@
     if (!state.isPdfLoaded) {
       if (elements.emptyStateOverlay) elements.emptyStateOverlay.classList.remove('hidden');
       if (elements.canvasTransformWrapper) elements.canvasTransformWrapper.classList.add('hidden');
-      elements.fileInfoLabel.textContent = 'Belum ada file PDF yang dibuka';
+      elements.fileInfoLabel.textContent = 'Pilih atau unggah denah';
+      renderHomeCloudSiteplans();
     }
 
     renderNodes();
@@ -235,13 +236,99 @@
     if (savedUrl && savedKey && window.supabase) {
       try {
         state.supabase = window.supabase.createClient(savedUrl, savedKey);
-        checkSupabaseHealth();
+        checkSupabaseHealth().then(() => {
+          if (!state.isPdfLoaded) renderHomeCloudSiteplans();
+        });
       } catch (err) {
         console.error('Failed to init Supabase client:', err);
         updateSupabaseStatusUI(false, 'Gagal Inisialisasi');
+        renderHomeCloudSiteplans();
       }
     } else {
       updateSupabaseStatusUI(false, 'Mode Lokal');
+      renderHomeCloudSiteplans();
+    }
+  }
+
+  async function renderHomeCloudSiteplans() {
+    if (!elements.homeCloudSiteplans) return;
+
+    if (!state.supabase || !state.supabaseConnected) {
+      elements.homeCloudSiteplans.innerHTML = `
+        <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-2">
+          <p class="text-slate-400 text-xs">Database Supabase belum terhubung.</p>
+          <button id="btn-home-connect-cloud" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-md shadow-emerald-600/20">
+            <i class="fa-solid fa-link mr-1"></i> Hubungkan Database Cloud
+          </button>
+        </div>
+      `;
+      const btn = document.getElementById('btn-home-connect-cloud');
+      if (btn) btn.addEventListener('click', openSupabaseConfigModal);
+      return;
+    }
+
+    elements.homeCloudSiteplans.innerHTML = `
+      <div class="text-center py-6 text-slate-500 text-xs">
+        <i class="fa-solid fa-spinner fa-spin text-lg mb-2 text-emerald-400"></i>
+        <p>Memuat daftar denah dari Supabase...</p>
+      </div>
+    `;
+
+    try {
+      const { data: siteplans, error } = await state.supabase
+        .from('siteplans')
+        .select('*, nodes(id)')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!siteplans || siteplans.length === 0) {
+        elements.homeCloudSiteplans.innerHTML = `
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-1">
+            <i class="fa-solid fa-folder-open text-2xl text-slate-600 mb-1"></i>
+            <p class="text-slate-300 text-xs font-semibold">Belum Ada Denah Tersimpan di Cloud</p>
+            <p class="text-[11px] text-slate-500">Unggah file PDF pertama Anda di bawah untuk mulai membuat masterplan.</p>
+          </div>
+        `;
+        return;
+      }
+
+      elements.homeCloudSiteplans.innerHTML = '';
+      siteplans.forEach(sp => {
+        const nodeCount = sp.nodes ? sp.nodes.length : 0;
+        const updatedDate = new Date(sp.updated_at).toLocaleString('id-ID', {
+          day: 'numeric', month: 'short', year: 'numeric'
+        });
+
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-emerald-500/40 transition-all text-xs group';
+        card.innerHTML = `
+          <div class="space-y-0.5 min-w-0 pr-2">
+            <h4 class="font-bold text-slate-200 text-xs group-hover:text-emerald-400 transition-colors truncate flex items-center gap-1.5">
+              <i class="fa-solid fa-file-lines text-emerald-400 text-[11px] shrink-0"></i>
+              <span class="truncate">${sp.name || 'Masterplan'}</span>
+            </h4>
+            <div class="flex items-center gap-2.5 text-[10px] text-slate-500">
+              <span class="text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">${nodeCount} Node</span>
+              <span><i class="fa-regular fa-clock mr-1"></i>${updatedDate}</span>
+            </div>
+          </div>
+          <button data-id="${sp.id}" class="btn-home-load-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15 shrink-0">
+            <i class="fa-solid fa-folder-open"></i> Buka
+          </button>
+        `;
+
+        card.querySelector('.btn-home-load-sp').addEventListener('click', () => loadCloudSiteplan(sp.id));
+        elements.homeCloudSiteplans.appendChild(card);
+      });
+    } catch (err) {
+      console.error('Error fetching home cloud siteplans:', err);
+      elements.homeCloudSiteplans.innerHTML = `
+        <div class="p-3 rounded-2xl bg-rose-950/20 border border-rose-900/40 text-center text-xs text-rose-400">
+          <p class="font-semibold">Gagal memuat denah cloud</p>
+          <p class="text-[10px] text-rose-300/80 mt-0.5">${err.message}</p>
+        </div>
+      `;
     }
   }
 
@@ -711,6 +798,20 @@
 
   // --- PDF ENGINE (PDF.js Rendering) ---
   function loadPdfFile(file) {
+    const isDifferentFile = (state.pdfFileName && state.pdfFileName !== file.name) || state.activeSiteplanId !== null;
+    
+    // Clear nodes when switching to a different/new siteplan
+    if (isDifferentFile) {
+      state.nodes = [];
+      state.activeSiteplanId = null;
+      state.history = [[]];
+      state.historyIndex = 0;
+      closeDrawer();
+      updateUndoRedoUI();
+      renderNodes();
+      updateStats();
+    }
+
     state.pdfFileName = file.name;
     state.pdfRawFile = file;
     state.pdfCloudUrl = null;

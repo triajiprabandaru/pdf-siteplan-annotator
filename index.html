@@ -63,18 +63,18 @@
 
       <div class="h-6 w-px bg-slate-800 hidden sm:block"></div>
 
-      <!-- Action File Controls -->
+      <!-- Action File Controls (Cloud is Primary, Buka PDF is Secondary) -->
       <div class="flex items-center gap-1.5 sm:gap-2">
-        <label for="pdf-file-input" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20">
-          <i class="fa-solid fa-file-pdf"></i>
+        <button id="btn-open-cloud" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20" title="Buka Denah Tersimpan dari Supabase Cloud">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+          <span class="hidden sm:inline">Cloud Denah</span>
+        </button>
+
+        <label for="pdf-file-input" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors" title="Unggah file PDF baru dari perangkat">
+          <i class="fa-solid fa-file-pdf text-rose-400"></i>
           <span class="hidden sm:inline">Buka PDF</span>
           <input type="file" id="pdf-file-input" accept="application/pdf" class="hidden">
         </label>
-
-        <button id="btn-open-cloud" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors" title="Buka Denah Tersimpan dari Supabase Cloud">
-          <i class="fa-solid fa-cloud-arrow-down text-emerald-400"></i>
-          <span class="hidden sm:inline">Cloud</span>
-        </button>
 
         <button id="btn-cloud-config" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors" title="Pengaturan Database Supabase">
           <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
@@ -258,20 +258,38 @@
     <!-- Viewport Surface for Pan & Zoom -->
     <div id="canvas-viewport" class="w-full h-full relative overflow-hidden">
       
-      <!-- Empty State Prompt Overlay -->
-      <div id="empty-state-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 sm:p-8">
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md max-w-md text-center border-dashed border-slate-700 p-6 sm:p-8 flex flex-col items-center">
-          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl sm:text-3xl mb-3 sm:mb-4 shadow-lg">
-            <i class="fa-solid fa-file-pdf"></i>
+      <!-- Cloud-First Library Empty State Overlay -->
+      <div id="empty-state-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div class="bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-xl max-w-xl w-full p-5 sm:p-8 flex flex-col items-center text-center">
+          
+          <!-- Icon & Header -->
+          <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg shadow-emerald-500/20">
+            <i class="fa-solid fa-map-location-dot"></i>
           </div>
-          <h3 class="text-sm sm:text-base font-bold text-slate-100 mb-1">Unggah PDF Siteplan</h3>
-          <p class="text-xs text-slate-400 mb-4 sm:mb-5 leading-relaxed">
-            Pilih file PDF siteplan Anda untuk menampilkan canvas interaktif dan mulai menambahkan node penandaan.
+          <h2 class="text-base sm:text-lg font-bold text-slate-100 mb-1">Pilih Denah Siteplan</h2>
+          <p class="text-xs text-slate-400 mb-5 sm:mb-6 max-w-md leading-relaxed">
+            Pilih masterplan yang tersimpan di Cloud Database Supabase untuk melihat dan mengelola titik kavling.
           </p>
-          <label for="pdf-file-input" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 sm:px-5 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-600/30">
-            <i class="fa-solid fa-upload"></i>
-            <span>Pilih File PDF Siteplan</span>
-          </label>
+
+          <!-- Cloud Siteplans Quick List Container -->
+          <div id="home-cloud-siteplans" class="w-full space-y-2.5 max-h-60 sm:max-h-72 overflow-y-auto pr-1 mb-5 sm:mb-6 text-left">
+            <div class="text-center py-6 text-slate-500 text-xs">
+              <i class="fa-solid fa-spinner fa-spin text-lg mb-2 text-emerald-400"></i>
+              <p>Menghubungkan ke Cloud Database...</p>
+            </div>
+          </div>
+
+          <div class="h-px bg-slate-800 w-full mb-4 sm:mb-5"></div>
+
+          <!-- Secondary Action: Upload Local PDF -->
+          <div class="flex flex-col sm:flex-row items-center justify-between w-full gap-2.5 sm:gap-3 text-xs">
+            <span class="text-slate-400 text-[11px]">Ingin membuat denah baru dari file lokal?</span>
+            <label for="pdf-file-input" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all shrink-0">
+              <i class="fa-solid fa-upload text-sky-400"></i>
+              <span>Unggah File PDF Baru</span>
+            </label>
+          </div>
+
         </div>
       </div>
 

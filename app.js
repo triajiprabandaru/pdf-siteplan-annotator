@@ -995,12 +995,11 @@
       marker.addEventListener('mouseenter', (e) => showTooltip(node, e));
       marker.addEventListener('mouseleave', hideTooltip);
       
-      marker.addEventListener('mousedown', (e) => {
+      const handleMarkerSelect = (e) => {
+        e.stopPropagation();
         if (state.activeMode === 'SELECT') {
-          e.stopPropagation();
           selectNode(node.id);
-        } else if (state.activeMode === 'MOVE_NODE') {
-          e.stopPropagation();
+        } else if (state.activeMode === 'MOVE_NODE' && e.type === 'mousedown') {
           state.draggedNodeId = node.id;
           state.dragOffset = {
             x: e.clientX,
@@ -1008,7 +1007,10 @@
           };
           selectNode(node.id);
         }
-      });
+      };
+
+      marker.addEventListener('mousedown', handleMarkerSelect);
+      marker.addEventListener('click', handleMarkerSelect);
 
       elements.nodesOverlay.appendChild(marker);
     });
@@ -1111,7 +1113,14 @@
       updateDrawerMinimizeIcon(true);
     }
 
-    renderNodes();
+    // Update marker selection highlight
+    document.querySelectorAll('.site-node-marker').forEach(el => {
+      if (el.dataset.nodeId === nodeId) {
+        el.classList.add('selected');
+      } else {
+        el.classList.remove('selected');
+      }
+    });
   }
 
   function toggleMinimizeDrawer() {

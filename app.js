@@ -50,7 +50,12 @@
     historyIndex: -1,
 
     // Pending coords for code modal creation
-    pendingNewNodeCoords: null
+    pendingNewNodeCoords: null,
+
+    // Supabase Cloud State
+    supabase: null,
+    supabaseConnected: false,
+    activeSiteplanId: null
   };
 
   // Configure PDF.js Worker
@@ -158,13 +163,40 @@
     toastIcon: document.getElementById('toast-icon'),
     toastTitle: document.getElementById('toast-title'),
     toastMessage: document.getElementById('toast-message'),
-    toastCloseBtn: document.getElementById('toast-close-btn')
+    toastCloseBtn: document.getElementById('toast-close-btn'),
+
+    // Supabase Cloud UI
+    btnOpenCloud: document.getElementById('btn-open-cloud'),
+    btnCloudConfig: document.getElementById('btn-cloud-config'),
+    cloudStatusDot: document.getElementById('cloud-status-dot'),
+    cloudStatusText: document.getElementById('cloud-status-text'),
+
+    // Supabase Config Modal
+    supabaseConfigModal: document.getElementById('supabase-config-modal'),
+    inputSupabaseUrl: document.getElementById('input-supabase-url'),
+    inputSupabaseKey: document.getElementById('input-supabase-key'),
+    supabaseStatusIndicator: document.getElementById('supabase-status-indicator'),
+    supabaseStatusLabel: document.getElementById('supabase-status-label'),
+    btnTestSupabase: document.getElementById('btn-test-supabase'),
+    btnSaveSupabase: document.getElementById('btn-save-supabase'),
+    btnDisconnectSupabase: document.getElementById('btn-disconnect-supabase'),
+    supabaseModalCloseBtn: document.getElementById('supabase-modal-close-btn'),
+    supabaseModalBtnCancel: document.getElementById('supabase-modal-btn-cancel'),
+
+    // Cloud Siteplans Modal
+    cloudSiteplansModal: document.getElementById('cloud-siteplans-modal'),
+    cloudSiteplansList: document.getElementById('cloud-siteplans-list'),
+    btnCloudSyncCurrent: document.getElementById('btn-cloud-sync-current'),
+    cloudModalCloseBtn: document.getElementById('cloud-modal-close-btn'),
+    cloudModalBtnClose: document.getElementById('cloud-modal-btn-close')
   };
 
+  // --- INITIALIZATION ---
   // --- INITIALIZATION ---
   function init() {
     setupEventListeners();
     loadSessionData();
+    initSupabase();
 
     if (!state.isPdfLoaded) {
       if (elements.emptyStateOverlay) elements.emptyStateOverlay.classList.remove('hidden');
@@ -174,6 +206,322 @@
 
     renderNodes();
     updateStats();
+  }
+
+  // ========================================================
+  // SUPABASE DATABASE & CLOUD SYNC ENGINE
+  // ========================================================
+  let cloudSyncDebounceTimer = null;
+
+  function initSupabase() {
+    const savedUrl = localStorage.getItem('supabase_url') || (window.ENV && window.ENV.SUPABASE_URL) || '';
+    const savedKey = localStorage.getItem('supabase_anon_key') || (window.ENV && window.ENV.SUPABASE_ANON_KEY) || '';
+
+    if (elements.inputSupabaseUrl) elements.inputSupabaseUrl.value = savedUrl;
+    if (elements.inputSupabaseKey) elements.inputSupabaseKey.value = savedKey;
+
+    if (savedUrl && savedKey && window.supabase) {
+      try {
+        state.supabase = window.supabase.createClient(savedUrl, savedKey);
+        checkSupabaseHealth();
+      } catch (err) {
+        console.error('Failed to init Supabase client:', err);
+        updateSupabaseStatusUI(false, 'Gagal Inisialisasi');
+      }
+    } else {
+      updateSupabaseStatusUI(false, 'Mode Lokal');
+    }
+  }
+
+  async function checkSupabaseHealth() {
+    if (!state.supabase) return false;
+    updateSupabaseStatusUI(null, 'Menghubungkan...');
+    try {
+      const { error } = await state.supabase.from('siteplans').select('id', { count: 'exact', head: true });
+      if (error) {
+        console.warn('Supabase query returned error (table might need schema):', error.message);
+        state.supabaseConnected = true;
+        updateSupabaseStatusUI(true, 'Cloud Terhubung');
+        return true;
+      }
+      state.supabaseConnected = true;
+      updateSupabaseStatusUI(true, 'Cloud Terhubung');
+      return true;
+    } catch (err) {
+      console.error('Supabase health check failed:', err);
+      state.supabaseConnected = false;
+      updateSupabaseStatusUI(false, 'Koneksi Gagal');
+      return false;
+    }
+  }
+
+  function updateSupabaseStatusUI(isConnected, statusText) {
+    if (isConnected === true) {
+      if (elements.cloudStatusDot) elements.cloudStatusDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+      if (elements.cloudStatusText) elements.cloudStatusText.textContent = statusText || 'Cloud Terhubung';
+      if (elements.supabaseStatusIndicator) elements.supabaseStatusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+      if (elements.supabaseStatusLabel) elements.supabaseStatusLabel.textContent = statusText || 'Terhubung ke Supabase';
+    } else if (isConnected === false) {
+      if (elements.cloudStatusDot) elements.cloudStatusDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+      if (elements.cloudStatusText) elements.cloudStatusText.textContent = statusText || 'Mode Lokal';
+      if (elements.supabaseStatusIndicator) elements.supabaseStatusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+      if (elements.supabaseStatusLabel) elements.supabaseStatusLabel.textContent = statusText || 'Belum Terhubung';
+    } else {
+      if (elements.cloudStatusDot) elements.cloudStatusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+      if (elements.cloudStatusText) elements.cloudStatusText.textContent = statusText || 'Menghubungkan...';
+      if (elements.supabaseStatusIndicator) elements.supabaseStatusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+      if (elements.supabaseStatusLabel) elements.supabaseStatusLabel.textContent = statusText || 'Menghubungkan...';
+    }
+  }
+
+  async function handleSaveSupabaseConfig() {
+    const url = (elements.inputSupabaseUrl.value || '').trim();
+    const key = (elements.inputSupabaseKey.value || '').trim();
+
+    if (!url || !key) {
+      showToast('error', 'Kredensial Belum Lengkap', 'Masukkan Supabase URL dan Anon Key.');
+      return;
+    }
+
+    localStorage.setItem('supabase_url', url);
+    localStorage.setItem('supabase_anon_key', key);
+
+    if (window.supabase) {
+      try {
+        state.supabase = window.supabase.createClient(url, key);
+        const ok = await checkSupabaseHealth();
+        if (ok) {
+          showToast('success', 'Supabase Terhubung!', 'Database Supabase berhasil terhubung.');
+          closeSupabaseConfigModal();
+        } else {
+          showToast('warning', 'Tersambung dengan Catatan', 'Pastikan script schema database (supabase-schema.sql) telah dijalankan di dashboard Supabase.');
+        }
+      } catch (err) {
+        showToast('error', 'Koneksi Gagal', err.message);
+      }
+    }
+  }
+
+  function handleDisconnectSupabase() {
+    localStorage.removeItem('supabase_url');
+    localStorage.removeItem('supabase_anon_key');
+    if (elements.inputSupabaseUrl) elements.inputSupabaseUrl.value = '';
+    if (elements.inputSupabaseKey) elements.inputSupabaseKey.value = '';
+    state.supabase = null;
+    state.supabaseConnected = false;
+    updateSupabaseStatusUI(false, 'Mode Lokal');
+    showToast('info', 'Supabase Diputuskan', 'Aplikasi kembali menggunakan penyimpanan lokal (LocalStorage).');
+  }
+
+  async function syncCurrentSiteplanToCloud(showToastFeedback = true) {
+    if (!state.supabase || !state.supabaseConnected) {
+      openSupabaseConfigModal();
+      return;
+    }
+
+    const siteplanName = state.pdfFileName || 'Masterplan Kavling';
+    try {
+      // 1. Upsert Siteplan record
+      let siteplanId = state.activeSiteplanId;
+      const siteplanPayload = {
+        name: siteplanName,
+        pdf_file_name: state.pdfFileName || '',
+        canvas_width: state.canvasWidth || 0,
+        canvas_height: state.canvasHeight || 0,
+        updated_at: new Date().toISOString()
+      };
+
+      if (siteplanId) {
+        const { error: spErr } = await state.supabase.from('siteplans').update(siteplanPayload).eq('id', siteplanId);
+        if (spErr) throw spErr;
+      } else {
+        const { data: newSp, error: spErr } = await state.supabase.from('siteplans').insert([siteplanPayload]).select().single();
+        if (spErr) throw spErr;
+        siteplanId = newSp.id;
+        state.activeSiteplanId = siteplanId;
+      }
+
+      // 2. Sync Nodes (Delete existing for this siteplan & re-insert)
+      await state.supabase.from('nodes').delete().eq('siteplan_id', siteplanId);
+
+      if (state.nodes.length > 0) {
+        const nodesPayload = state.nodes.map(node => ({
+          id: node.id,
+          siteplan_id: siteplanId,
+          code: node.code || '',
+          category: node.category || 'SAAKUURAA',
+          type: node.type || 'Single',
+          status: node.status || 'RENCANA',
+          x: node.x,
+          y: node.y,
+          dimension: node.dimension || '',
+          area: node.area || '',
+          properties: node.properties || [],
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error: nodeErr } = await state.supabase.from('nodes').insert(nodesPayload);
+        if (nodeErr) throw nodeErr;
+      }
+
+      if (showToastFeedback) {
+        showToast('success', 'Sinkronisasi Cloud Berhasil!', `Data denah & ${state.nodes.length} node berhasil disimpan di Supabase.`);
+      }
+    } catch (err) {
+      console.error('Error syncing to Supabase:', err);
+      if (showToastFeedback) {
+        showToast('error', 'Gagal Sinkronisasi Cloud', err.message || 'Terjadi kesalahan saat menyimpan ke Supabase.');
+      }
+    }
+  }
+
+  async function openCloudSiteplansModal() {
+    if (!state.supabase || !state.supabaseConnected) {
+      openSupabaseConfigModal();
+      return;
+    }
+
+    elements.cloudSiteplansModal.classList.remove('hidden');
+    renderCloudSiteplansList();
+  }
+
+  function closeCloudSiteplansModal() {
+    elements.cloudSiteplansModal.classList.add('hidden');
+  }
+
+  async function renderCloudSiteplansList() {
+    if (!elements.cloudSiteplansList) return;
+    elements.cloudSiteplansList.innerHTML = `
+      <div class="text-center py-8 text-slate-500 text-xs">
+        <i class="fa-solid fa-spinner fa-spin text-lg mb-2 text-emerald-400"></i>
+        <p>Memuat daftar denah dari Supabase...</p>
+      </div>
+    `;
+
+    try {
+      const { data: siteplans, error } = await state.supabase
+        .from('siteplans')
+        .select('*, nodes(id)')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!siteplans || siteplans.length === 0) {
+        elements.cloudSiteplansList.innerHTML = `
+          <div class="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
+            <i class="fa-solid fa-folder-open text-2xl mb-2 text-slate-600"></i>
+            <p class="font-medium text-slate-400">Belum ada denah di Supabase</p>
+            <p class="text-[11px] text-slate-600 mt-1">Buka PDF dan klik "Simpan Denah Ini ke Cloud".</p>
+          </div>
+        `;
+        return;
+      }
+
+      elements.cloudSiteplansList.innerHTML = '';
+      siteplans.forEach(sp => {
+        const nodeCount = sp.nodes ? sp.nodes.length : 0;
+        const updatedDate = new Date(sp.updated_at).toLocaleString('id-ID', {
+          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all text-xs';
+        card.innerHTML = `
+          <div class="space-y-0.5">
+            <h4 class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+              <i class="fa-solid fa-file-lines text-emerald-400 text-[11px]"></i>
+              ${sp.name || 'Masterplan'}
+            </h4>
+            <div class="flex items-center gap-3 text-[10px] text-slate-500">
+              <span><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${nodeCount} Node</span>
+              <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>${updatedDate}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button data-id="${sp.id}" class="btn-load-cloud-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15">
+              <i class="fa-solid fa-folder-open"></i> Buka
+            </button>
+            <button data-id="${sp.id}" class="btn-delete-cloud-sp text-slate-500 hover:text-rose-400 p-1.5 transition-colors" title="Hapus dari Cloud">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        `;
+
+        card.querySelector('.btn-load-cloud-sp').addEventListener('click', () => loadCloudSiteplan(sp.id));
+        card.querySelector('.btn-delete-cloud-sp').addEventListener('click', () => deleteCloudSiteplan(sp.id, sp.name));
+        elements.cloudSiteplansList.appendChild(card);
+      });
+    } catch (err) {
+      console.error('Error fetching cloud siteplans:', err);
+      elements.cloudSiteplansList.innerHTML = `
+        <div class="text-center py-6 text-rose-400 text-xs bg-rose-950/20 rounded-xl border border-rose-900/40 p-3">
+          <i class="fa-solid fa-triangle-exclamation text-lg mb-1"></i>
+          <p class="font-semibold">Gagal memuat denah</p>
+          <p class="text-[10px] text-rose-300/80 mt-1">${err.message}</p>
+        </div>
+      `;
+    }
+  }
+
+  async function loadCloudSiteplan(siteplanId) {
+    try {
+      const { data: sp, error: spErr } = await state.supabase.from('siteplans').select('*').eq('id', siteplanId).single();
+      if (spErr) throw spErr;
+
+      const { data: nodes, error: nodeErr } = await state.supabase.from('nodes').select('*').eq('siteplan_id', siteplanId);
+      if (nodeErr) throw nodeErr;
+
+      state.activeSiteplanId = sp.id;
+      state.pdfFileName = sp.pdf_file_name || sp.name;
+      state.nodes = (nodes || []).map(n => ({
+        id: n.id,
+        code: n.code,
+        category: n.category || 'SAAKUURAA',
+        type: n.type || 'Single',
+        status: n.status || 'RENCANA',
+        x: Number(n.x),
+        y: Number(n.y),
+        dimension: n.dimension || '',
+        area: n.area || '',
+        properties: n.properties || []
+      }));
+
+      if (elements.fileInfoLabel) {
+        elements.fileInfoLabel.textContent = `Cloud: ${state.pdfFileName}`;
+      }
+
+      saveSessionData(true);
+      renderNodes();
+      updateStats();
+      closeCloudSiteplansModal();
+      showToast('success', 'Denah Cloud Dimuat!', `Berhasil memuat "${sp.name}" dengan ${state.nodes.length} node.`);
+    } catch (err) {
+      console.error('Error loading cloud siteplan:', err);
+      showToast('error', 'Gagal Memuat Denah', err.message);
+    }
+  }
+
+  async function deleteCloudSiteplan(siteplanId, name) {
+    if (!confirm(`Hapus denah "${name}" dari Supabase Cloud?`)) return;
+    try {
+      const { error } = await state.supabase.from('siteplans').delete().eq('id', siteplanId);
+      if (error) throw error;
+      if (state.activeSiteplanId === siteplanId) {
+        state.activeSiteplanId = null;
+      }
+      showToast('success', 'Denah Dihapus', `Denah "${name}" berhasil dihapus dari cloud.`);
+      renderCloudSiteplansList();
+    } catch (err) {
+      showToast('error', 'Gagal Menghapus', err.message);
+    }
+  }
+
+  function openSupabaseConfigModal() {
+    elements.supabaseConfigModal.classList.remove('hidden');
+  }
+
+  function closeSupabaseConfigModal() {
+    elements.supabaseConfigModal.classList.add('hidden');
   }
 
   // --- UNDO / REDO HISTORY ENGINE ---
@@ -219,7 +567,7 @@
     if (elements.btnRedo) elements.btnRedo.disabled = state.historyIndex >= state.history.length - 1;
   }
 
-  // --- LOCAL STORAGE DATA PERSISTENCE ---
+  // --- LOCAL STORAGE & CLOUD DATA PERSISTENCE ---
   function saveSessionData(recordHistory = true) {
     try {
       localStorage.setItem('siteplan_nodes_v2', JSON.stringify(state.nodes));
@@ -228,6 +576,14 @@
       }
       if (recordHistory) {
         pushHistory();
+      }
+
+      // Auto-Sync Debounce to Supabase Cloud if connected
+      if (state.supabaseConnected && state.activeSiteplanId) {
+        if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
+        cloudSyncDebounceTimer = setTimeout(() => {
+          syncCurrentSiteplanToCloud(false);
+        }, 1500);
       }
     } catch (e) {
       console.warn('Failed to save to localStorage:', e);
@@ -1426,6 +1782,39 @@
     if (elements.btnClearNodes) elements.btnClearNodes.addEventListener('click', openClearAllModal);
     if (elements.clearModalBtnCancel) elements.clearModalBtnCancel.addEventListener('click', closeClearAllModal);
     if (elements.clearModalBtnConfirm) elements.clearModalBtnConfirm.addEventListener('click', executeClearAllNodes);
+
+    // Supabase Cloud Configuration UI
+    if (elements.btnCloudConfig) elements.btnCloudConfig.addEventListener('click', openSupabaseConfigModal);
+    if (elements.supabaseModalCloseBtn) elements.supabaseModalCloseBtn.addEventListener('click', closeSupabaseConfigModal);
+    if (elements.supabaseModalBtnCancel) elements.supabaseModalBtnCancel.addEventListener('click', closeSupabaseConfigModal);
+    if (elements.btnSaveSupabase) elements.btnSaveSupabase.addEventListener('click', handleSaveSupabaseConfig);
+    if (elements.btnDisconnectSupabase) elements.btnDisconnectSupabase.addEventListener('click', handleDisconnectSupabase);
+    if (elements.btnTestSupabase) {
+      elements.btnTestSupabase.addEventListener('click', async () => {
+        const url = (elements.inputSupabaseUrl.value || '').trim();
+        const key = (elements.inputSupabaseKey.value || '').trim();
+        if (!url || !key) {
+          showToast('error', 'Isi Kredensial', 'Masukkan URL & Key terlebih dahulu.');
+          return;
+        }
+        updateSupabaseStatusUI(null, 'Menguji Koneksi...');
+        try {
+          const testClient = window.supabase.createClient(url, key);
+          const { error } = await testClient.from('siteplans').select('id', { count: 'exact', head: true });
+          updateSupabaseStatusUI(true, 'Koneksi Berhasil');
+          showToast('success', 'Koneksi Sukses!', 'Berhasil terhubung ke Supabase.');
+        } catch (e) {
+          updateSupabaseStatusUI(false, 'Gagal');
+          showToast('error', 'Koneksi Gagal', e.message);
+        }
+      });
+    }
+
+    // Supabase Cloud Siteplans Modal UI
+    if (elements.btnOpenCloud) elements.btnOpenCloud.addEventListener('click', openCloudSiteplansModal);
+    if (elements.cloudModalCloseBtn) elements.cloudModalCloseBtn.addEventListener('click', closeCloudSiteplansModal);
+    if (elements.cloudModalBtnClose) elements.cloudModalBtnClose.addEventListener('click', closeCloudSiteplansModal);
+    if (elements.btnCloudSyncCurrent) elements.btnCloudSyncCurrent.addEventListener('click', () => syncCurrentSiteplanToCloud(true));
 
     // Toast Notification Close Button
     if (elements.toastCloseBtn) elements.toastCloseBtn.addEventListener('click', hideToast);

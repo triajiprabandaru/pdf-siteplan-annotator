@@ -1,0 +1,20 @@
+﻿{
+  "name": "pdf-siteplan-annotator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive PDF Masterplan Siteplan Node Annotator with Supabase and Vercel",
+  "scripts": {
+    "dev": "python -m http.server 8080",
+    "start": "python -m http.server 8080"
+  },
+  "keywords": [
+    "pdf",
+    "siteplan",
+    "annotator",
+    "supabase",
+    "vercel",
+    "masterplan"
+  ],
+  "author": "Triaji Prabandaru",
+  "license": "MIT"
+}

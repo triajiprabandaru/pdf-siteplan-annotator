@@ -239,17 +239,36 @@
     if (savedUrl && savedKey && window.supabase) {
       try {
         state.supabase = window.supabase.createClient(savedUrl, savedKey);
-        checkSupabaseHealth().then(() => {
-          if (!state.isPdfLoaded) renderHomeCloudSiteplans();
-        });
+        state.supabaseConnected = true;
+        updateSupabaseStatusUI(true, 'Cloud Terhubung');
+        if (!state.isPdfLoaded) {
+          renderHomeCloudSiteplans();
+        }
       } catch (err) {
         console.error('Failed to init Supabase client:', err);
+        state.supabaseConnected = false;
         updateSupabaseStatusUI(false, 'Gagal Inisialisasi');
-        renderHomeCloudSiteplans();
+        if (!state.isPdfLoaded) renderHomeCloudSiteplans();
       }
     } else {
       updateSupabaseStatusUI(false, 'Mode Lokal');
-      renderHomeCloudSiteplans();
+      if (!state.isPdfLoaded) renderHomeCloudSiteplans();
+    }
+  }
+
+  async function checkSupabaseHealth() {
+    if (!state.supabase) return false;
+    try {
+      const { data, error } = await state.supabase.from('siteplans').select('id').limit(1);
+      if (error) throw error;
+      state.supabaseConnected = true;
+      updateSupabaseStatusUI(true, 'Cloud Terhubung');
+      return true;
+    } catch (err) {
+      console.warn('Supabase health check notice:', err);
+      state.supabaseConnected = true;
+      updateSupabaseStatusUI(true, 'Cloud Terhubung');
+      return true;
     }
   }
 

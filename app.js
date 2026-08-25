@@ -165,8 +165,9 @@
     toastMessage: document.getElementById('toast-message'),
     toastCloseBtn: document.getElementById('toast-close-btn'),
 
-    // Supabase Cloud UI
+    // Supabase Cloud UI & Top Bar Actions
     btnOpenCloud: document.getElementById('btn-open-cloud'),
+    btnSaveCloud: document.getElementById('btn-save-cloud'),
     btnCloudConfig: document.getElementById('btn-cloud-config'),
     cloudStatusDot: document.getElementById('cloud-status-dot'),
     cloudStatusText: document.getElementById('cloud-status-text'),
@@ -392,6 +393,7 @@
         if (ok) {
           showToast('success', 'Supabase Terhubung!', 'Database Supabase berhasil terhubung.');
           closeSupabaseConfigModal();
+          if (!state.isPdfLoaded) renderHomeCloudSiteplans();
         } else {
           showToast('warning', 'Tersambung dengan Catatan', 'Pastikan script schema database (supabase-schema.sql) telah dijalankan di dashboard Supabase.');
         }
@@ -410,6 +412,7 @@
     state.supabaseConnected = false;
     updateSupabaseStatusUI(false, 'Mode Lokal');
     showToast('info', 'Supabase Diputuskan', 'Aplikasi kembali menggunakan penyimpanan lokal (LocalStorage).');
+    if (!state.isPdfLoaded) renderHomeCloudSiteplans();
   }
 
   async function syncCurrentSiteplanToCloud(showToastFeedback = true) {
@@ -487,12 +490,12 @@
       }
 
       if (showToastFeedback) {
-        showToast('success', 'Sinkronisasi Cloud Berhasil!', `Data denah & ${state.nodes.length} node tersimpan di Supabase.`);
+        showToast('success', 'Tersimpan ke Cloud!', `Data denah & ${state.nodes.length} node berhasil disimpan di Supabase.`);
       }
     } catch (err) {
       console.error('Error syncing to Supabase:', err);
       if (showToastFeedback) {
-        showToast('error', 'Gagal Sinkronisasi Cloud', err.message || 'Terjadi kesalahan saat menyimpan ke Supabase.');
+        showToast('error', 'Gagal Simpan ke Cloud', err.message || 'Terjadi kesalahan saat menyimpan ke Supabase.');
       }
     }
   }
@@ -533,7 +536,7 @@
           <div class="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
             <i class="fa-solid fa-folder-open text-2xl mb-2 text-slate-600"></i>
             <p class="font-medium text-slate-400">Belum ada denah di Supabase</p>
-            <p class="text-[11px] text-slate-600 mt-1">Buka PDF dan klik "Simpan Denah Ini ke Cloud".</p>
+            <p class="text-[11px] text-slate-600 mt-1">Unggah file PDF di bawah untuk mulai membuat masterplan baru.</p>
           </div>
         `;
         return;
@@ -549,17 +552,17 @@
         const card = document.createElement('div');
         card.className = 'flex items-center justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all text-xs';
         card.innerHTML = `
-          <div class="space-y-0.5">
-            <h4 class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-              <i class="fa-solid fa-file-lines text-emerald-400 text-[11px]"></i>
-              ${sp.name || 'Masterplan'}
+          <div class="space-y-0.5 min-w-0 pr-2">
+            <h4 class="font-bold text-slate-200 text-xs flex items-center gap-1.5 truncate">
+              <i class="fa-solid fa-file-lines text-emerald-400 text-[11px] shrink-0"></i>
+              <span class="truncate">${sp.name || 'Masterplan'}</span>
             </h4>
             <div class="flex items-center gap-3 text-[10px] text-slate-500">
-              <span><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${nodeCount} Node</span>
+              <span class="text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">${nodeCount} Node</span>
               <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>${updatedDate}</span>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 shrink-0">
             <button data-id="${sp.id}" class="btn-load-cloud-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15">
               <i class="fa-solid fa-folder-open"></i> Buka
             </button>
@@ -685,13 +688,20 @@
     try {
       const { error } = await state.supabase.from('siteplans').delete().eq('id', siteplanId);
       if (error) throw error;
+
+      showToast('success', 'Denah Dihapus', `Denah "${name}" telah dihapus dari cloud.`);
+      renderCloudSiteplansList();
+      if (!state.isPdfLoaded) renderHomeCloudSiteplans();
       if (state.activeSiteplanId === siteplanId) {
         state.activeSiteplanId = null;
+        state.nodes = [];
+        saveSessionData();
+        renderNodes();
+        updateStats();
       }
-      showToast('success', 'Denah Dihapus', `Denah "${name}" berhasil dihapus dari cloud.`);
-      renderCloudSiteplansList();
     } catch (err) {
-      showToast('error', 'Gagal Menghapus', err.message);
+      console.error('Error deleting cloud siteplan:', err);
+      showToast('error', 'Gagal Menghapus Denah', err.message);
     }
   }
 
@@ -1204,6 +1214,24 @@
     elements.customPropsContainer.appendChild(row);
   }
 
+  function updateDrawerStatusButtons(currentStatus) {
+    const statusMap = {
+      'RENCANA': ['bg-slate-800', 'border-slate-500', 'text-slate-200'],
+      'CONSTRUCTION': ['bg-slate-800', 'border-slate-600', 'text-slate-300'],
+      'FUNERAL_READY': ['bg-orange-500/10', 'border-orange-500/40', 'text-orange-400'],
+      'FINISH': ['bg-emerald-500/10', 'border-emerald-500/40', 'text-emerald-400']
+    };
+
+    elements.drawerStatusBtns.forEach(btn => {
+      const status = btn.dataset.status;
+      btn.className = 'status-option p-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all ';
+      if (status === currentStatus) {
+        const classes = statusMap[status] || ['bg-slate-800', 'border-slate-500', 'text-slate-200'];
+        btn.classList.add(...classes, 'border');
+      } else {
+        btn.classList.add('bg-slate-900', 'border', 'border-slate-800', 'text-slate-400');
+      }
+    });
   // --- INSTANT AUTO-SAVE ON DRAWER EDIT ---
   function saveSelectedNode(recordHistory = true) {
     if (!state.selectedNodeId) return;

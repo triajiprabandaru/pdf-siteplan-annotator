@@ -63,24 +63,22 @@
 
       <div class="h-6 w-px bg-slate-800 hidden sm:block"></div>
 
-      <!-- Action File Controls (Cloud is Primary, Buka PDF is Secondary) -->
+      <!-- Action File Controls (Buka PDF, Simpan, Cloud Status) -->
       <div class="flex items-center gap-1.5 sm:gap-2">
-        <button id="btn-open-cloud" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20" title="Buka Denah Tersimpan dari Supabase Cloud">
-          <i class="fa-solid fa-cloud-arrow-down"></i>
-          <span class="hidden sm:inline">Cloud Denah</span>
+        <button id="btn-open-cloud" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20" title="Buka PDF Siteplan dari Cloud atau Perangkat">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>Buka PDF</span>
         </button>
 
-        <label for="pdf-file-input" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors" title="Unggah file PDF baru dari perangkat">
-          <i class="fa-solid fa-file-pdf text-rose-400"></i>
-          <span class="hidden sm:inline">Buka PDF</span>
-          <input type="file" id="pdf-file-input" accept="application/pdf" class="hidden">
-        </label>
+        <button id="btn-save-cloud" class="bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-400 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-700 hover:border-emerald-500 flex items-center gap-1.5 transition-all" title="Simpan Denah dan Node Saat Ini ke Database Cloud">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Simpan</span>
+        </button>
 
-        <button id="btn-cloud-config" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors" title="Pengaturan Database Supabase">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-950/70 border border-slate-800 text-[11px]" title="Status Koneksi Cloud">
           <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
-          <span id="cloud-status-text" class="text-[10px] sm:text-[11px] text-slate-300 hidden md:inline">Supabase</span>
-          <i class="fa-solid fa-gear text-slate-400 text-[10px]"></i>
-        </button>
+          <span id="cloud-status-text" class="text-[10px] sm:text-[11px] text-slate-400 hidden lg:inline">Mode Lokal</span>
+        </div>
       </div>
     </div>
 
@@ -619,17 +617,17 @@
     </div>
   </div>
 
-  <!-- Cloud Saved Siteplans Modal -->
+  <!-- Buka PDF Dialog Modal (Cloud Library & Local Upload) -->
   <div id="cloud-siteplans-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 transition-all">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4 max-h-[88vh] flex flex-col">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-lg shadow-lg">
-            <i class="fa-solid fa-cloud"></i>
+            <i class="fa-solid fa-folder-open"></i>
           </div>
           <div>
-            <h3 class="font-bold text-slate-100 text-sm">Denah Masterplan di Supabase Cloud</h3>
-            <p class="text-xs text-slate-400">Pilih denah untuk dibuka atau disinkronkan</p>
+            <h3 class="font-bold text-slate-100 text-sm">Buka PDF Siteplan</h3>
+            <p class="text-xs text-slate-400">Pilih masterplan dari cloud database atau unggah file baru</p>
           </div>
         </div>
         <button id="cloud-modal-close-btn" class="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800/60 transition-colors">
@@ -638,19 +636,29 @@
       </div>
 
       <!-- Siteplan List Container -->
-      <div id="cloud-siteplans-list" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[150px] max-h-[350px]">
-        <!-- Dynamic Siteplan Cards Injected Here -->
-        <div class="text-center py-8 text-slate-500 text-xs">
-          <i class="fa-solid fa-spinner fa-spin text-lg mb-2 text-emerald-400"></i>
-          <p>Memuat daftar denah dari Supabase...</p>
+      <div class="space-y-1.5">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Masterplan Tersimpan di Cloud</p>
+        <div id="cloud-siteplans-list" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px] max-h-[280px]">
+          <!-- Dynamic Siteplan Cards Injected Here -->
+          <div class="text-center py-8 text-slate-500 text-xs">
+            <i class="fa-solid fa-spinner fa-spin text-lg mb-2 text-emerald-400"></i>
+            <p>Memuat daftar denah dari Supabase...</p>
+          </div>
         </div>
       </div>
 
-      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-        <button id="btn-cloud-sync-current" type="button" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20">
-          <i class="fa-solid fa-cloud-arrow-up"></i> Simpan Denah Ini ke Cloud
-        </button>
-        <button id="cloud-modal-btn-close" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition-colors">
+      <!-- Secondary Local File Upload Option -->
+      <div class="pt-3 border-t border-slate-800 space-y-2">
+        <p class="text-[11px] text-slate-400">Atau unggah file PDF lokal baru dari perangkat:</p>
+        <label for="pdf-file-input" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all w-full shadow-sm">
+          <i class="fa-solid fa-file-pdf text-rose-400"></i>
+          <span>Pilih File PDF dari Komputer / HP</span>
+          <input type="file" id="pdf-file-input" accept="application/pdf" class="hidden">
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end pt-2 border-t border-slate-800">
+        <button id="cloud-modal-btn-close" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-5 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition-colors">
           Tutup
         </button>
       </div>

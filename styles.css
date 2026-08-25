@@ -119,11 +119,41 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
-/* Mobile Bottom Sheet Drawer States */
+/* Sidebar Drawer on Desktop (>= 768px) */
+@media (min-width: 768px) {
+  #node-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 24rem;
+    border-left: 1px solid rgba(51, 65, 85, 0.8);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    will-change: transform;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  #node-drawer.drawer-closed {
+    transform: translateX(100%) !important;
+  }
+
+  #node-drawer.drawer-expanded,
+  #node-drawer.drawer-minimized {
+    transform: translateX(0) !important;
+  }
+}
+
+/* Mobile Bottom Sheet Drawer States (< 768px) */
 @media (max-width: 767px) {
   #node-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
     max-height: 85vh;
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+    border-top: 1px solid rgba(51, 65, 85, 0.8);
     border-top-left-radius: 1.5rem;
     border-top-right-radius: 1.5rem;
     will-change: transform;

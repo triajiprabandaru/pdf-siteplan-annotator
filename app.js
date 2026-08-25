@@ -1098,10 +1098,7 @@
     updateDrawerStatusButtons(node.status || 'RENCANA');
     renderCustomPropertyInputs(node.properties || []);
 
-    // Desktop
-    elements.nodeDrawer.classList.remove('translate-x-full');
-    
-    // Mobile Bottom Sheet
+    // Open Drawer (Desktop Sidebar & Mobile Bottom Sheet)
     elements.nodeDrawer.classList.remove('drawer-closed');
     if (expandSheet || !isDrawerMinimized) {
       isDrawerMinimized = false;
@@ -1140,9 +1137,6 @@
   function closeDrawer() {
     state.selectedNodeId = null;
     isDrawerMinimized = false;
-    // Desktop
-    elements.nodeDrawer.classList.add('translate-x-full');
-    // Mobile Bottom Sheet
     elements.nodeDrawer.classList.remove('drawer-expanded', 'drawer-minimized');
     elements.nodeDrawer.classList.add('drawer-closed');
     renderNodes();

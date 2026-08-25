@@ -226,8 +226,8 @@
   let cloudSyncDebounceTimer = null;
 
   function initSupabase() {
-    const savedUrl = localStorage.getItem('supabase_url') || (window.ENV && window.ENV.SUPABASE_URL) || '';
-    const savedKey = localStorage.getItem('supabase_anon_key') || (window.ENV && window.ENV.SUPABASE_ANON_KEY) || '';
+    const savedUrl = (window.ENV && window.ENV.SUPABASE_URL) || localStorage.getItem('supabase_url') || '';
+    const savedKey = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || localStorage.getItem('supabase_anon_key') || '';
 
     if (elements.inputSupabaseUrl) elements.inputSupabaseUrl.value = savedUrl;
     if (elements.inputSupabaseKey) elements.inputSupabaseKey.value = savedKey;

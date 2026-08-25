@@ -226,10 +226,12 @@
   // SUPABASE DATABASE & CLOUD SYNC ENGINE
   // ========================================================
   let cloudSyncDebounceTimer = null;
+  const DEFAULT_SUPABASE_URL = "https://arvgoqepxfxivkvpsupc.supabase.co";
+  const DEFAULT_SUPABASE_KEY = "sb_publishable_8HNGRd1yOF4iiLs_CuFhlw_sFWNjusF";
 
   function initSupabase() {
-    const savedUrl = (window.ENV && window.ENV.SUPABASE_URL) || localStorage.getItem('supabase_url') || '';
-    const savedKey = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || localStorage.getItem('supabase_anon_key') || '';
+    const savedUrl = (window.ENV && window.ENV.SUPABASE_URL) || localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+    const savedKey = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || localStorage.getItem('supabase_anon_key') || DEFAULT_SUPABASE_KEY;
 
     if (elements.inputSupabaseUrl) elements.inputSupabaseUrl.value = savedUrl;
     if (elements.inputSupabaseKey) elements.inputSupabaseKey.value = savedKey;

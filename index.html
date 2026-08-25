@@ -75,10 +75,10 @@
           <span>Simpan</span>
         </button>
 
-        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-950/70 border border-slate-800 text-[11px]" title="Status Koneksi Cloud">
+        <button id="btn-cloud-config" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-950/70 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] transition-all cursor-pointer" title="Klik untuk melihat status / konfigurasi koneksi Supabase">
           <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
-          <span id="cloud-status-text" class="text-[10px] sm:text-[11px] text-slate-400 hidden lg:inline">Mode Lokal</span>
-        </div>
+          <span id="cloud-status-text" class="text-[10px] sm:text-[11px] text-slate-400">Menghubungkan...</span>
+        </button>
       </div>
     </div>
 
@@ -681,7 +681,8 @@
     </div>
   </div>
 
-  <!-- App Script -->
+  <!-- Application Configuration & Main Scripts -->
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

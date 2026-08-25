@@ -112,24 +112,32 @@
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-/* Sidebar Drawer Base Styling (Desktop Default) */
+/* Sidebar Drawer Base Styling (Desktop & Global Default) */
 #node-drawer {
-  position: absolute;
+  position: fixed;
   top: 0;
   right: 0;
-  height: 100%;
-  width: 24rem;
+  bottom: 0;
+  width: 384px;
   max-width: 90vw;
-  z-index: 40;
+  height: 100vh;
+  z-index: 50;
   display: flex;
   flex-direction: column;
-  background: rgba(15, 23, 42, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(15, 23, 42, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-left: 1px solid rgba(51, 65, 85, 0.8);
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.6);
   will-change: transform;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+#node-drawer.drawer-expanded {
+  transform: translateX(0) !important;
+  pointer-events: auto !important;
 }
 
 #node-drawer.drawer-closed {
@@ -137,16 +145,9 @@
   pointer-events: none !important;
 }
 
-#node-drawer.drawer-expanded,
-#node-drawer.drawer-minimized {
-  transform: translateX(0) !important;
-  pointer-events: auto !important;
-}
-
 /* Mobile Bottom Sheet Override (< 768px) */
 @media (max-width: 767px) {
   #node-drawer {
-    position: fixed;
     top: auto;
     bottom: 0;
     left: 0;
@@ -154,23 +155,26 @@
     width: 100%;
     max-width: 100vw;
     height: 82vh;
-    max-height: 85vh;
     border-left: none;
     border-top: 1px solid rgba(51, 65, 85, 0.8);
     border-top-left-radius: 1.5rem;
     border-top-right-radius: 1.5rem;
-  }
-
-  #node-drawer.drawer-closed {
-    transform: translateY(100%) !important;
-  }
-
-  #node-drawer.drawer-minimized {
-    transform: translateY(calc(100% - 64px)) !important;
+    transform: translateY(100%);
   }
 
   #node-drawer.drawer-expanded {
     transform: translateY(0) !important;
+    pointer-events: auto !important;
+  }
+
+  #node-drawer.drawer-minimized {
+    transform: translateY(calc(100% - 64px)) !important;
+    pointer-events: auto !important;
+  }
+
+  #node-drawer.drawer-closed {
+    transform: translateY(100%) !important;
+    pointer-events: none !important;
   }
 
   /* Prevent zoom on text inputs on iOS Safari */

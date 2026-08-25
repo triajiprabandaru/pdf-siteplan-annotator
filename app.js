@@ -183,6 +183,18 @@
     supabaseModalCloseBtn: document.getElementById('supabase-modal-close-btn'),
     supabaseModalBtnCancel: document.getElementById('supabase-modal-btn-cancel'),
 
+    // Mobile Responsive Elements
+    btnMobileActionsToggle: document.getElementById('btn-mobile-actions-toggle'),
+    mobileActionsMenu: document.getElementById('mobile-actions-menu'),
+    btnExportExcelMob: document.getElementById('btn-export-excel-mob'),
+    btnExportImageMob: document.getElementById('btn-export-image-mob'),
+    btnExportJsonMob: document.getElementById('btn-export-json-mob'),
+    jsonImportInputMob: document.getElementById('json-import-input-mob'),
+    btnClearNodesMob: document.getElementById('btn-clear-nodes-mob'),
+    drawerMinimizeBtn: document.getElementById('drawer-minimize-btn'),
+    drawerDragHandle: document.getElementById('drawer-drag-handle'),
+    drawerNodeCodeBadge: document.getElementById('drawer-node-code-badge'),
+
     // Cloud Siteplans Modal
     cloudSiteplansModal: document.getElementById('cloud-siteplans-modal'),
     cloudSiteplansList: document.getElementById('cloud-siteplans-list'),
@@ -882,7 +894,9 @@
   }
 
   // --- NODE SELECTION & DRAWER EDITOR ---
-  function selectNode(nodeId) {
+  let isDrawerMinimized = false;
+
+  function selectNode(nodeId, expandSheet = true) {
     state.selectedNodeId = nodeId;
     const node = state.nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -895,36 +909,60 @@
     elements.coordX.textContent = Math.round(node.x);
     elements.coordY.textContent = Math.round(node.y);
 
+    if (elements.drawerNodeCodeBadge) {
+      elements.drawerNodeCodeBadge.textContent = node.code || 'Node';
+    }
+
     updateDrawerStatusButtons(node.status || 'RENCANA');
     renderCustomPropertyInputs(node.properties || []);
 
+    // Desktop
     elements.nodeDrawer.classList.remove('translate-x-full');
+    
+    // Mobile Bottom Sheet
+    elements.nodeDrawer.classList.remove('drawer-closed');
+    if (expandSheet || !isDrawerMinimized) {
+      isDrawerMinimized = false;
+      elements.nodeDrawer.classList.remove('drawer-minimized');
+      elements.nodeDrawer.classList.add('drawer-expanded');
+      updateDrawerMinimizeIcon(false);
+    } else {
+      elements.nodeDrawer.classList.remove('drawer-expanded');
+      elements.nodeDrawer.classList.add('drawer-minimized');
+      updateDrawerMinimizeIcon(true);
+    }
+
     renderNodes();
   }
 
-  function updateDrawerStatusButtons(currentStatus) {
-    const statusMap = {
-      'RENCANA': ['bg-slate-800', 'border-slate-500', 'text-slate-200'],
-      'CONSTRUCTION': ['bg-slate-800', 'border-slate-600', 'text-slate-300'],
-      'FUNERAL_READY': ['bg-orange-500/10', 'border-orange-500/40', 'text-orange-400'],
-      'FINISH': ['bg-emerald-500/10', 'border-emerald-500/40', 'text-emerald-400']
-    };
+  function toggleMinimizeDrawer() {
+    isDrawerMinimized = !isDrawerMinimized;
+    if (isDrawerMinimized) {
+      elements.nodeDrawer.classList.remove('drawer-expanded');
+      elements.nodeDrawer.classList.add('drawer-minimized');
+      updateDrawerMinimizeIcon(true);
+    } else {
+      elements.nodeDrawer.classList.remove('drawer-minimized');
+      elements.nodeDrawer.classList.add('drawer-expanded');
+      updateDrawerMinimizeIcon(false);
+    }
+  }
 
-    elements.drawerStatusBtns.forEach(btn => {
-      const status = btn.dataset.status;
-      btn.className = 'status-option p-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all ';
-      if (status === currentStatus) {
-        const classes = statusMap[status] || ['bg-slate-800', 'border-slate-500', 'text-slate-200'];
-        btn.classList.add(...classes, 'border');
-      } else {
-        btn.classList.add('bg-slate-900', 'border', 'border-slate-800', 'text-slate-400');
-      }
-    });
+  function updateDrawerMinimizeIcon(minimized) {
+    if (!elements.drawerMinimizeBtn) return;
+    elements.drawerMinimizeBtn.innerHTML = minimized 
+      ? '<i class="fa-solid fa-chevron-up text-xs"></i>' 
+      : '<i class="fa-solid fa-chevron-down text-xs"></i>';
   }
 
   function closeDrawer() {
     state.selectedNodeId = null;
+    isDrawerMinimized = false;
+    // Desktop
     elements.nodeDrawer.classList.add('translate-x-full');
+    // Mobile Bottom Sheet
+    elements.nodeDrawer.classList.remove('drawer-expanded', 'drawer-minimized');
+    elements.nodeDrawer.classList.add('drawer-closed');
     renderNodes();
   }
 
@@ -1818,6 +1856,160 @@
 
     // Toast Notification Close Button
     if (elements.toastCloseBtn) elements.toastCloseBtn.addEventListener('click', hideToast);
+
+    // --- MULTI-TOUCH & PINCH-TO-ZOOM GESTURES (MOBILE) ---
+    const touchState = {
+      isPinching: false,
+      initialDistance: 0,
+      initialScale: 1,
+      pinchCenterX: 0,
+      pinchCenterY: 0,
+      isPanning: false,
+      startX: 0,
+      startY: 0,
+      lastTouchX: 0,
+      lastTouchY: 0,
+      tapStartTime: 0,
+      hasMoved: false
+    };
+
+    elements.canvasViewport.addEventListener('touchstart', (e) => {
+      if (e.target.closest('#node-drawer') || e.target.closest('.fixed')) return;
+
+      if (e.touches.length === 2) {
+        touchState.isPinching = true;
+        touchState.isPanning = false;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        touchState.initialDistance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        touchState.initialScale = state.transform.scale;
+        touchState.pinchCenterX = (t1.clientX + t2.clientX) / 2;
+        touchState.pinchCenterY = (t1.clientY + t2.clientY) / 2;
+      } else if (e.touches.length === 1) {
+        const t = e.touches[0];
+        touchState.tapStartTime = Date.now();
+        touchState.lastTouchX = t.clientX;
+        touchState.lastTouchY = t.clientY;
+        touchState.startX = t.clientX - state.transform.x;
+        touchState.startY = t.clientY - state.transform.y;
+        touchState.hasMoved = false;
+
+        if (state.activeMode !== 'ADD_NODE' && !e.target.closest('.site-node-marker')) {
+          touchState.isPanning = true;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      // 2-Finger Pinch Zoom
+      if (touchState.isPinching && e.touches.length === 2) {
+        if (e.cancelable) e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        if (touchState.initialDistance > 0) {
+          const factor = currentDist / touchState.initialDistance;
+          let targetScale = Math.min(10, Math.max(0.1, touchState.initialScale * factor));
+          const rect = elements.canvasTransformWrapper.getBoundingClientRect();
+          const originX = (touchState.pinchCenterX - rect.left) / state.transform.scale;
+          const originY = (touchState.pinchCenterY - rect.top) / state.transform.scale;
+          state.transform.x -= originX * (targetScale - state.transform.scale);
+          state.transform.y -= originY * (targetScale - state.transform.scale);
+          state.transform.scale = targetScale;
+          applyTransform();
+        }
+        return;
+      }
+
+      // 1-Finger Pan or Node Drag
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const moveDist = Math.hypot(t.clientX - touchState.lastTouchX, t.clientY - touchState.lastTouchY);
+        if (moveDist > 6) {
+          touchState.hasMoved = true;
+        }
+
+        // Node drag in move mode
+        if (state.draggedNodeId && state.activeMode === 'MOVE_NODE') {
+          if (e.cancelable) e.preventDefault();
+          const node = state.nodes.find(n => n.id === state.draggedNodeId);
+          if (node) {
+            const rect = elements.canvasTransformWrapper.getBoundingClientRect();
+            node.x = Math.round((t.clientX - rect.left) / state.transform.scale);
+            node.y = Math.round((t.clientY - rect.top) / state.transform.scale);
+            elements.coordX.textContent = Math.round(node.x);
+            elements.coordY.textContent = Math.round(node.y);
+            renderNodes();
+          }
+          return;
+        }
+
+        // Map pan
+        if (touchState.isPanning) {
+          if (e.cancelable) e.preventDefault();
+          state.transform.x = t.clientX - touchState.startX;
+          state.transform.y = t.clientY - touchState.startY;
+          applyTransform();
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (touchState.isPinching && e.touches.length < 2) {
+        touchState.isPinching = false;
+      }
+
+      if (state.draggedNodeId) {
+        state.draggedNodeId = null;
+        saveSessionData();
+      }
+
+      if (touchState.isPanning) {
+        touchState.isPanning = false;
+      }
+
+      // Handle Quick Tap for Add Node Mode on Mobile
+      const tapDuration = Date.now() - touchState.tapStartTime;
+      if (state.activeMode === 'ADD_NODE' && !touchState.hasMoved && tapDuration < 300 && e.changedTouches.length === 1) {
+        const t = e.changedTouches[0];
+        const clickedEl = document.elementFromPoint(t.clientX, t.clientY);
+        if (clickedEl && !clickedEl.closest('.site-node-marker') && 
+            !clickedEl.closest('#node-drawer') && 
+            !clickedEl.closest('.fixed')) {
+          const rect = elements.canvasTransformWrapper.getBoundingClientRect();
+          const canvasX = Math.round((t.clientX - rect.left) / state.transform.scale);
+          const canvasY = Math.round((t.clientY - rect.top) / state.transform.scale);
+          openCodeModal(canvasX, canvasY);
+        }
+      }
+    });
+
+    // Mobile Actions Toggle Menu
+    if (elements.btnMobileActionsToggle && elements.mobileActionsMenu) {
+      elements.btnMobileActionsToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.mobileActionsMenu.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!elements.mobileActionsMenu.classList.contains('hidden') && !e.target.closest('#btn-mobile-actions-toggle')) {
+          elements.mobileActionsMenu.classList.add('hidden');
+        }
+      });
+    }
+
+    if (elements.btnExportExcelMob) elements.btnExportExcelMob.addEventListener('click', () => { elements.mobileActionsMenu.classList.add('hidden'); exportExcel(); });
+    if (elements.btnExportImageMob) elements.btnExportImageMob.addEventListener('click', () => { elements.mobileActionsMenu.classList.add('hidden'); openExportImageModal(); });
+    if (elements.btnExportJsonMob) elements.btnExportJsonMob.addEventListener('click', () => { elements.mobileActionsMenu.classList.add('hidden'); exportJson(); });
+    if (elements.jsonImportInputMob) elements.jsonImportInputMob.addEventListener('change', (e) => {
+      elements.mobileActionsMenu.classList.add('hidden');
+      if (e.target.files.length > 0) importJson(e.target.files[0]);
+    });
+    if (elements.btnClearNodesMob) elements.btnClearNodesMob.addEventListener('click', () => { elements.mobileActionsMenu.classList.add('hidden'); openClearAllModal(); });
+
+    // Drawer Mobile Bottom Sheet Toggle & Handle
+    if (elements.drawerMinimizeBtn) elements.drawerMinimizeBtn.addEventListener('click', toggleMinimizeDrawer);
+    if (elements.drawerDragHandle) elements.drawerDragHandle.addEventListener('click', toggleMinimizeDrawer);
 
     // Keyboard Shortcuts (Undo, Redo, Delete)
     window.addEventListener('keydown', (e) => {

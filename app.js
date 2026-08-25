@@ -333,13 +333,36 @@
 
     const siteplanName = state.pdfFileName || 'Masterplan Kavling';
     try {
+      let pdfUrl = state.pdfCloudUrl || null;
+      let storagePath = null;
+
+      // Optional: Upload PDF file to Supabase Storage bucket 'siteplans' if available
+      if (state.pdfRawFile && !state.pdfCloudUrl) {
+        try {
+          const cleanName = (state.pdfRawFile.name || 'siteplan.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+          storagePath = `pdfs/${Date.now()}_${cleanName}`;
+          const { error: upErr } = await state.supabase.storage.from('siteplans').upload(storagePath, state.pdfRawFile, { upsert: true });
+          if (!upErr) {
+            const { data: urlData } = state.supabase.storage.from('siteplans').getPublicUrl(storagePath);
+            if (urlData && urlData.publicUrl) {
+              pdfUrl = urlData.publicUrl;
+              state.pdfCloudUrl = pdfUrl;
+            }
+          }
+        } catch (storageErr) {
+          console.warn('Supabase storage upload skipped or bucket not ready:', storageErr);
+        }
+      }
+
       // 1. Upsert Siteplan record
       let siteplanId = state.activeSiteplanId;
       const siteplanPayload = {
         name: siteplanName,
         pdf_file_name: state.pdfFileName || '',
-        canvas_width: state.canvasWidth || 0,
-        canvas_height: state.canvasHeight || 0,
+        pdf_url: pdfUrl,
+        pdf_storage_path: storagePath,
+        canvas_width: state.canvasWidth || 1400,
+        canvas_height: state.canvasHeight || 900,
         updated_at: new Date().toISOString()
       };
 
@@ -377,7 +400,7 @@
       }
 
       if (showToastFeedback) {
-        showToast('success', 'Sinkronisasi Cloud Berhasil!', `Data denah & ${state.nodes.length} node berhasil disimpan di Supabase.`);
+        showToast('success', 'Sinkronisasi Cloud Berhasil!', `Data denah & ${state.nodes.length} node tersimpan di Supabase.`);
       }
     } catch (err) {
       console.error('Error syncing to Supabase:', err);
@@ -485,6 +508,7 @@
 
       state.activeSiteplanId = sp.id;
       state.pdfFileName = sp.pdf_file_name || sp.name;
+      state.pdfCloudUrl = sp.pdf_url || null;
       state.nodes = (nodes || []).map(n => ({
         id: n.id,
         code: n.code,
@@ -502,14 +526,70 @@
         elements.fileInfoLabel.textContent = `Cloud: ${state.pdfFileName}`;
       }
 
-      saveSessionData(true);
-      renderNodes();
-      updateStats();
+      state.isPdfLoaded = true;
+      if (elements.emptyStateOverlay) elements.emptyStateOverlay.classList.add('hidden');
+      if (elements.canvasTransformWrapper) {
+        elements.canvasTransformWrapper.classList.remove('hidden');
+        elements.canvasTransformWrapper.style.display = '';
+      }
+
+      // If PDF URL is stored in Supabase, load and render the PDF document
+      if (sp.pdf_url && window.pdfjsLib) {
+        window.pdfjsLib.getDocument(sp.pdf_url).promise.then(pdfDoc => {
+          state.pdfDoc = pdfDoc;
+          state.numPages = pdfDoc.numPages;
+          state.currentPage = 1;
+          renderPdfPage(state.currentPage).then(() => {
+            saveSessionData(true);
+            renderNodes();
+            updateStats();
+            fitToViewport();
+          });
+        }).catch(err => {
+          console.warn('Could not load PDF from URL, using canvas viewport:', err);
+          initFallbackCanvas(sp.canvas_width || 1400, sp.canvas_height || 900);
+          saveSessionData(true);
+          renderNodes();
+          updateStats();
+          fitToViewport();
+        });
+      } else {
+        // Fallback: render canvas with saved dimensions so nodes are visible
+        initFallbackCanvas(sp.canvas_width || 1400, sp.canvas_height || 900);
+        saveSessionData(true);
+        renderNodes();
+        updateStats();
+        fitToViewport();
+      }
+
       closeCloudSiteplansModal();
       showToast('success', 'Denah Cloud Dimuat!', `Berhasil memuat "${sp.name}" dengan ${state.nodes.length} node.`);
     } catch (err) {
       console.error('Error loading cloud siteplan:', err);
       showToast('error', 'Gagal Memuat Denah', err.message);
+    }
+  }
+
+  function initFallbackCanvas(width, height) {
+    state.canvasWidth = width;
+    state.canvasHeight = height;
+    elements.siteplanCanvas.width = width;
+    elements.siteplanCanvas.height = height;
+    elements.siteplanCanvas.style.width = width + 'px';
+    elements.siteplanCanvas.style.height = height + 'px';
+
+    const ctx = elements.siteplanCanvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw subtle grid
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < width; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    }
+    for (let y = 0; y < height; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
     }
   }
 
@@ -632,6 +712,8 @@
   // --- PDF ENGINE (PDF.js Rendering) ---
   function loadPdfFile(file) {
     state.pdfFileName = file.name;
+    state.pdfRawFile = file;
+    state.pdfCloudUrl = null;
     elements.fileInfoLabel.textContent = `File PDF: ${file.name}`;
 
     const reader = new FileReader();

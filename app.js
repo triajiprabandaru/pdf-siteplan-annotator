@@ -319,12 +319,18 @@
               <span><i class="fa-regular fa-clock mr-1"></i>${updatedDate}</span>
             </div>
           </div>
-          <button data-id="${sp.id}" class="btn-home-load-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15 shrink-0">
-            <i class="fa-solid fa-folder-open"></i> Buka
-          </button>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button data-id="${sp.id}" class="btn-home-load-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15">
+              <i class="fa-solid fa-folder-open"></i> Buka
+            </button>
+            <button data-id="${sp.id}" class="btn-home-rename-sp text-slate-500 hover:text-amber-400 p-1.5 transition-colors" title="Ubah Nama">
+              <i class="fa-solid fa-pen text-[11px]"></i>
+            </button>
+          </div>
         `;
 
         card.querySelector('.btn-home-load-sp').addEventListener('click', () => loadCloudSiteplan(sp.id));
+        card.querySelector('.btn-home-rename-sp').addEventListener('click', () => renameCloudSiteplan(sp.id, sp.name, 'home'));
         elements.homeCloudSiteplans.appendChild(card);
       });
     } catch (err) {
@@ -571,6 +577,9 @@
             <button data-id="${sp.id}" class="btn-load-cloud-sp bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-md shadow-emerald-600/15">
               <i class="fa-solid fa-folder-open"></i> Buka
             </button>
+            <button data-id="${sp.id}" class="btn-rename-cloud-sp text-slate-500 hover:text-amber-400 p-1.5 transition-colors" title="Ubah Nama">
+              <i class="fa-solid fa-pen"></i>
+            </button>
             <button data-id="${sp.id}" class="btn-delete-cloud-sp text-slate-500 hover:text-rose-400 p-1.5 transition-colors" title="Hapus dari Cloud">
               <i class="fa-solid fa-trash-can"></i>
             </button>
@@ -578,6 +587,7 @@
         `;
 
         card.querySelector('.btn-load-cloud-sp').addEventListener('click', () => loadCloudSiteplan(sp.id));
+        card.querySelector('.btn-rename-cloud-sp').addEventListener('click', () => renameCloudSiteplan(sp.id, sp.name, 'modal'));
         card.querySelector('.btn-delete-cloud-sp').addEventListener('click', () => deleteCloudSiteplan(sp.id, sp.name));
         elements.cloudSiteplansList.appendChild(card);
       });
@@ -707,6 +717,32 @@
     } catch (err) {
       console.error('Error deleting cloud siteplan:', err);
       showToast('error', 'Gagal Menghapus Denah', err.message);
+    }
+  }
+
+  async function renameCloudSiteplan(siteplanId, currentName, source) {
+    const newName = prompt('Masukkan nama baru untuk denah:', currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+    try {
+      const { error } = await state.supabase
+        .from('siteplans')
+        .update({ name: newName.trim(), updated_at: new Date().toISOString() })
+        .eq('id', siteplanId);
+      if (error) throw error;
+
+      showToast('success', 'Nama Diubah', `Denah berhasil diubah menjadi "${newName.trim()}".`);
+
+      if (state.activeSiteplanId === siteplanId) {
+        state.pdfFileName = newName.trim();
+        elements.fileInfoLabel.textContent = newName.trim();
+      }
+
+      if (source === 'modal') renderCloudSiteplansList();
+      renderHomeCloudSiteplans();
+    } catch (err) {
+      console.error('Error renaming cloud siteplan:', err);
+      showToast('error', 'Gagal Mengubah Nama', err.message);
     }
   }
 

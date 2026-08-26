@@ -229,7 +229,7 @@
   const DEFAULT_SUPABASE_URL = "https://arvgoqepxfxivkvpsupc.supabase.co";
   const DEFAULT_SUPABASE_KEY = "sb_publishable_8HNGRd1yOF4iiLs_CuFhlw_sFWNjusF";
 
-  function initSupabase() {
+  async function initSupabase() {
     const savedUrl = (window.ENV && window.ENV.SUPABASE_URL) || localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
     const savedKey = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || localStorage.getItem('supabase_anon_key') || DEFAULT_SUPABASE_KEY;
 
@@ -239,8 +239,8 @@
     if (savedUrl && savedKey && window.supabase) {
       try {
         state.supabase = window.supabase.createClient(savedUrl, savedKey);
-        state.supabaseConnected = true;
-        updateSupabaseStatusUI(true, 'Cloud Terhubung');
+        updateSupabaseStatusUI(null, 'Menghubungkan ke Cloud...');
+        await checkSupabaseHealth();
         if (!state.isPdfLoaded) {
           renderHomeCloudSiteplans();
         }
@@ -253,22 +253,6 @@
     } else {
       updateSupabaseStatusUI(false, 'Mode Lokal');
       if (!state.isPdfLoaded) renderHomeCloudSiteplans();
-    }
-  }
-
-  async function checkSupabaseHealth() {
-    if (!state.supabase) return false;
-    try {
-      const { data, error } = await state.supabase.from('siteplans').select('id').limit(1);
-      if (error) throw error;
-      state.supabaseConnected = true;
-      updateSupabaseStatusUI(true, 'Cloud Terhubung');
-      return true;
-    } catch (err) {
-      console.warn('Supabase health check notice:', err);
-      state.supabaseConnected = true;
-      updateSupabaseStatusUI(true, 'Cloud Terhubung');
-      return true;
     }
   }
 

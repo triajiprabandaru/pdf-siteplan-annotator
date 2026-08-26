@@ -2073,6 +2073,7 @@
     if (elements.cloudModalCloseBtn) elements.cloudModalCloseBtn.addEventListener('click', closeCloudSiteplansModal);
     if (elements.cloudModalBtnClose) elements.cloudModalBtnClose.addEventListener('click', closeCloudSiteplansModal);
     if (elements.btnCloudSyncCurrent) elements.btnCloudSyncCurrent.addEventListener('click', () => syncCurrentSiteplanToCloud(true));
+    if (elements.btnSaveCloud) elements.btnSaveCloud.addEventListener('click', () => syncCurrentSiteplanToCloud(true));
 
     // Toast Notification Close Button
     if (elements.toastCloseBtn) elements.toastCloseBtn.addEventListener('click', hideToast);

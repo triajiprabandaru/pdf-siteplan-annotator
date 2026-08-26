@@ -1253,6 +1253,8 @@
         btn.classList.add('bg-slate-900', 'border', 'border-slate-800', 'text-slate-400');
       }
     });
+  }
+
   // --- INSTANT AUTO-SAVE ON DRAWER EDIT ---
   function saveSelectedNode(recordHistory = true) {
     if (!state.selectedNodeId) return;
